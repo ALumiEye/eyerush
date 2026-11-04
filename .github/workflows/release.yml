@@ -1,0 +1,35 @@
+name: Release
+
+# Pushing a tag such as v0.2.0 builds the game and publishes a GitHub release with the
+# single-file game (eyerush.html) attached, ready to download and double-click.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          notes="docs/releases/$TAG.md"
+          if [ -f "$notes" ]; then
+            gh release create "$TAG" dist/eyerush.html --title "EyeRush $TAG" --notes-file "$notes"
+          else
+            gh release create "$TAG" dist/eyerush.html --title "EyeRush $TAG" --generate-notes
+          fi

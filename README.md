@@ -11,10 +11,17 @@ buýt, xe ba gác; bấm còi dẹp đường, cắt qua ngõ nhỏ, xuyên ch�
 
 ## Play / Chơi ngay
 
-**No install:** run `pnpm build` and open `dist/eyerush.html` by double-clicking it. The whole game
-is in that one file.
+**In the browser / Trên trình duyệt:** https://alumieye.github.io/eyerush/
 
-**Không cần cài:** chạy `pnpm build` rồi bấm đúp file `dist/eyerush.html`. Cả game nằm trong một file.
+**Offline, no install:** download `eyerush.html` from the
+[latest release](https://github.com/ALumiEye/eyerush/releases/latest) and double-click it. The whole
+game is in that one file.
+
+**Không cần mạng, không cần cài:** tải `eyerush.html` ở
+[bản phát hành mới nhất](https://github.com/ALumiEye/eyerush/releases/latest) rồi bấm đúp để mở.
+
+Releases: push a tag such as `v0.2.0` and the Release workflow builds the game and publishes it,
+using `docs/releases/<tag>.md` as the notes when that file exists.
 
 **From source / Từ mã nguồn** (Node.js 22+ and pnpm):
 
