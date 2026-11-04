@@ -1,0 +1,29 @@
+{
+  "name": "eyerush",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Motorbike racing through rush-hour streets, in the browser. By ALumiEye.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@10.20.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && vite build --mode single && tsx scripts/single.ts",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "race": "tsx scripts/race.ts",
+    "shot": "tsx scripts/shot.ts"
+  },
+  "dependencies": {
+    "pixi.js": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "playwright-core": "1.64.1",
+    "tsx": "^4.20.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.1.0"
+  }
+}
