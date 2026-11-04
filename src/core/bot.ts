@@ -1,4 +1,4 @@
-import { GROUND, ROUTE, surfaceAt } from "./city";
+import { GROUND, isSolid, ROUTE, surfaceAt } from "./city";
 import { angleDiff, clamp, random } from "./rng";
 import { type Body, type Grid } from "./traffic";
 import { type GameState, type Input, type Racer, Surface } from "./types";
@@ -97,7 +97,7 @@ export function botInput(state: GameState, racer: Racer, grid: Grid, bodies: Bod
       const x = racer.x + (cx - racer.x) * f;
       const y = racer.y + (cy - racer.y) * f;
       const surface = surfaceAt(GROUND, x, y);
-      if (surface === Surface.Building || surface === Surface.Stall || surface === Surface.Water) {
+      if (isSolid(surface) || surface === Surface.Water) {
         cost += 1000;
         break;
       }

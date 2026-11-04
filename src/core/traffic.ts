@@ -89,7 +89,7 @@ export function placeOf(network: Network, npc: Pick<Npc, "edge" | "forward" | "s
 export function laneRange(width: number, kind: VehicleKind): [number, number] {
   const half = width / 2;
   const body = SIZES[kind].width / 2;
-  if (kind === "bike") return [0.5 + body, half - 0.4 - body];
+  if (kind === "bike") return [(width >= 12 ? 1.2 : 0.5) + body, half - 0.4 - body];
   if (kind === "cart") return [half * 0.55, half - 0.5 - body];
   return [half / 2 + 0.2, half / 2 + 0.6];
 }

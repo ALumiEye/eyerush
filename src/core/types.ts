@@ -21,6 +21,7 @@ export const enum Surface {
   Market = 6,
   Path = 7,
   Stall = 8,
+  Median = 9,
 }
 
 export interface Input {
@@ -137,7 +138,24 @@ export type GameEvent =
 
 export type Phase = "countdown" | "race" | "done";
 
+export interface CommuteState {
+  deadlineTicks: number;
+  penaltyTicks: number;
+  violations: number;
+  potholeHits: number;
+  stoppedTicks: number;
+  notice: "redLight" | "police" | "wrongDirection" | "pothole" | "crater" | null;
+  /** Correct lane to restore after a wrong-way detention. */
+  laneRespawn: { x: number; y: number; heading: number } | null;
+  noticeUntil: number;
+  outcome: "travelling" | "onTime" | "late";
+  checkpoint: number;
+  /** Hazards currently under the bike; leaving and re-entering counts as a new hit. */
+  touchingHoles: number[];
+}
+
 export interface GameState {
+  commute?: CommuteState;
   tick: number;
   rng: number;
   phase: Phase;

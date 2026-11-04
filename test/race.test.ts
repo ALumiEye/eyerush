@@ -106,7 +106,7 @@ describe("race", () => {
     const state = emptyCity();
     const me = state.racers[0];
     me.safeX = 56;
-    me.safeY = 16;
+    me.safeY = 19;
     me.x = 136;
     me.y = 112;
     run(state, 2, GO);

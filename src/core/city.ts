@@ -55,6 +55,25 @@ export const STREETS: Street[] = [
   alley(true, 296, 80, 208, "Ngõ Đèn Lồng"),
 ];
 
+/** Raised two-metre flower beds, with openings at every road and alley junction. */
+export const MEDIANS = STREETS.filter((s) => s.kind === "avenue").flatMap((s) => {
+  const spans: { x0: number; y0: number; x1: number; y1: number; vertical: boolean }[] = [];
+  let start = -1;
+  for (let t = s.from; t <= s.to; t += 1) {
+    const open = t === s.to || STREETS.some((cross) =>
+      cross.vertical !== s.vertical && s.at >= cross.from && s.at <= cross.to &&
+      t >= cross.at - cross.width / 2 - 4 && t < cross.at + cross.width / 2 + 4);
+    if (!open && start < 0) start = t;
+    if (open && start >= 0) {
+      spans.push(s.vertical
+        ? { x0: s.at - 1, y0: start, x1: s.at + 1, y1: t, vertical: true }
+        : { x0: start, y0: s.at - 1, x1: t, y1: s.at + 1, vertical: false });
+      start = -1;
+    }
+  }
+  return spans;
+});
+
 /** The lake park and the market fill two whole blocks. */
 export const PARK = { x0: 96, y0: 80, x1: 176, y1: 144, lake: { x: 136, y: 112, rx: 22, ry: 13 } };
 export const MARKET = { x0: 96, y0: 144, x1: 176, y1: 208 };
@@ -69,22 +88,22 @@ export interface Gate {
 }
 
 export const GATES: Gate[] = [
-  { x: 56, y: 16, r: 10, heading: 0 },
+  { x: 56, y: 19, r: 10, heading: 0 },
   { x: 256, y: 52, r: 9, heading: Math.PI / 2 },
   { x: 216, y: 208, r: 10, heading: Math.PI },
-  { x: 16, y: 112, r: 10, heading: -Math.PI / 2 },
+  { x: 19, y: 112, r: 10, heading: -Math.PI / 2 },
 ];
 
-/** The bots' line around the course: junction centres, with the gates on the way. */
+/** The bots follow the right-hand lanes, staying clear of raised medians. */
 export const ROUTE: [number, number][] = [
-  [56, 16],
-  [256, 16],
-  [256, 52],
-  [256, 208],
-  [216, 208],
-  [16, 208],
-  [16, 112],
-  [16, 16],
+  [56, 19],
+  [253, 19],
+  [253, 52],
+  [253, 205],
+  [216, 205],
+  [19, 205],
+  [19, 112],
+  [19, 19],
 ];
 
 export const insideCity = (x: number, y: number) => x >= 0 && y >= 0 && x < CITY_W && y < CITY_H;
@@ -146,13 +165,14 @@ export function buildGround(): Uint8Array {
   for (const s of STREETS) if (s.kind !== "alley") rect(s, s.width / 2 + SIDEWALK, s.width / 2 + SIDEWALK, Surface.Sidewalk);
   for (const s of STREETS) if (s.kind === "alley") rect(s, s.width / 2, 0, Surface.Alley);
   for (const s of STREETS) if (s.kind !== "alley") rect(s, s.width / 2, s.width / 2, Surface.Road);
+  for (const m of MEDIANS) fill(m.x0, m.y0, m.x1, m.y1, Surface.Median);
   return ground;
 }
 
 export const surfaceAt = (ground: Uint8Array, x: number, y: number): Surface =>
   insideCity(x, y) ? (ground[Math.floor(y) * CITY_W + Math.floor(x)] as Surface) : Surface.Building;
 
-export const isSolid = (surface: Surface) => surface === Surface.Building || surface === Surface.Stall;
+export const isSolid = (surface: Surface) => surface === Surface.Building || surface === Surface.Stall || surface === Surface.Median;
 
 /** A junction in the traffic network. */
 export interface Node {

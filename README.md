@@ -1,13 +1,15 @@
 # EyeRush
 
-**Phố Đua · by ALumiEye**
+**Đi làm giờ cao điểm · by ALumiEye**
 
-Motorbike racing through rush-hour streets, in the browser. Weave through hundreds of bikes, cars,
-buses and delivery carts, honk your way through, cut down alleys and across the market, and beat
-the other riders home.
+07:57. You overslept, and work starts at 08:00. Ride your motorbike from home to the office through
+rush-hour traffic, stop at red lights, mind traffic police, and dodge potholes and road craters.
+No racing opponents or laps: the clock is your rival.
 
-Đua xe máy xuyên phố giờ cao điểm, chơi ngay trên trình duyệt. Lách qua hàng trăm xe máy, ô tô, xe
-buýt, xe ba gác; bấm còi dẹp đường, cắt qua ngõ nhỏ, xuyên chợ và về đích trước các tay lái khác.
+07:57. Bạn vừa dậy muộn và 08:00 phải chấm công. Lái xe máy từ nhà đến cơ quan, vượt qua tắc đường,
+đèn xanh đèn đỏ, chốt CSGT, ổ gà và ổ voi. Không đua vòng, không đối thủ — chỉ có bạn và giờ đi làm.
+
+The commute changes below are local until a new deployment/release; the public links may still run the previous version.
 
 ## Play / Chơi ngay
 
@@ -49,9 +51,30 @@ Có hỗ trợ tay cầm. Trên điện thoại xe tự chạy: lái bằng nút
 
 ## How it plays / Lối chơi
 
-- **Gates:** pass the gates in order; three laps wins. Any route is allowed: alleys, sidewalks, the
-  covered market, the lake park. The arrow at the screen edge points to the next gate.
-  / Đi qua các cổng theo thứ tự, đủ 3 vòng là về đích. Đường nào cũng được.
+- **Morning route:** follow five ordered navigation markers from home to the office. The minimap
+  shows the route; the screen-edge arrow points to the next stop. Arrive before the deadline to win.
+  / Theo năm điểm dẫn đường từ nhà đến cơ quan, tới trước giờ chấm công để thắng.
+- **Deadline:** easy/normal/hard allow 180/150/120 real seconds, representing 07:57–08:00 on the
+  morning clock. Police detention consumes actual game time; there is no additional clock jump.
+  / Dễ/thường/khó có 180/150/120 giây chơi, tương ứng 07:57–08:00 trong game.
+- **Red lights and police:** crossing any red stop line triggers a 5-second police detention, with
+  an on-screen countdown and an officer beside the bike. Throttle, boost and reset are locked;
+  traffic cannot shove the rider away. The clock keeps running and can expire during detention.
+  / Vượt đèn đỏ ở mọi giao lộ sẽ bị CSGT giữ xe 5 giây, có đếm ngược; không thể chạy hay reset
+  để thoát. Đồng hồ vẫn trôi. Đây là luật arcade, không phải mức phạt giao thông thực tế.
+- **Navigation and rider:** larger high-contrast minimap, amber current leg, blue upcoming route,
+  white heading arrow and labeled office. Bikes show a rider, forward visor, handlebars/headlight
+  and red tail lamp; the worker carries a work bag.
+- **Flower medians:** raised flower beds replace yellow avenue centre lines and physically block
+  crossing, with openings at roads and alleys. Hard impacts can cause a crash.
+  / Dải phân cách trồng hoa có va chạm, chừa lối tại giao lộ và ngõ.
+- **Wrong-way riding:** travelling against your lane triggers a 5-second police detention, then
+  relocates you to the right-hand lane facing your intended direction. Junction turns and slow
+  reverse manoeuvres are excluded. / Ngược chiều bị giữ 5 giây rồi đưa về đúng làn, đúng hướng.
+- **Quick controls:** the in-game guide stays visible. Use four arrows or WASD; Down/S brakes then
+  reverses, Space boosts. No separate desktop brake button.
+- **Potholes and craters:** potholes kill momentum; hitting a crater above 32 km/h throws you off.
+  Dodge them, or crawl below 11 km/h to cross without damage. / Né ổ gà, ổ voi hoặc giảm tốc để qua.
 - **Rush-hour traffic:** every vehicle drives its own lane, stops at red lights and brakes for what
   is ahead. Bikes squeeze into gaps; after a long wait, everyone noses through the junction.
   / Xe trong phố tự chạy theo làn, dừng đèn đỏ, xe máy lách khe.
@@ -61,7 +84,9 @@ Có hỗ trợ tay cầm. Trên điện thoại xe tự chạy: lái bằng nút
 - **Crashes:** hit a wall or a vehicle hard and the rider falls for over a second; ride into the lake
   and you are put back on the road. / Đâm mạnh là té xe; lao xuống hồ thì được đưa lại lên đường.
 
-Settings: difficulty, traffic density (light, rush hour, gridlock) and 3 or 5 rivals.
+Settings: difficulty and traffic density (light, rush hour, gridlock). Results report arrival status,
+violations, actual time detained, pothole hits and crashes. The original race simulation remains for
+menu attract mode and headless bot regression checks.
 
 ## Code
 

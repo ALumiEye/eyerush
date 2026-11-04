@@ -1,5 +1,5 @@
 import { Texture } from "pixi.js";
-import { CITY_H, CITY_W, GATES, GROUND, MARKET, NETWORK, PARK, SIDEWALK, STREETS } from "../core/city";
+import { CITY_H, CITY_W, GROUND, MARKET, MEDIANS, NETWORK, PARK, SIDEWALK, STREETS } from "../core/city";
 import type { VehicleKind } from "../core/types";
 import { Surface } from "../core/types";
 import { LOOKS, SIZES } from "../core/traffic";
@@ -97,6 +97,10 @@ export function paintCity(): HTMLCanvasElement {
           [r, gr, b] = [150, 140, 132];
           k = 1 + n * 0.14;
           break;
+        case Surface.Median:
+          [r, gr, b] = [69, 105, 55];
+          k = 1 + n * 0.12;
+          break;
         case Surface.Grass:
           [r, gr, b] = [104, 152, 72];
           k = 1 + n * 0.22 + (hash(Math.floor(px / 3), Math.floor(py / 3), 4) < 0.08 ? -0.15 : 0);
@@ -186,14 +190,7 @@ export function paintCity(): HTMLCanvasElement {
     const dx = (b.x - a.x) / edge.length;
     const dy = (b.y - a.y) / edge.length;
     const at = (s: number, side: number) => [(a.x + dx * s - dy * side) * PPM, (a.y + dy * s + dx * side) * PPM];
-    if (edge.kind === "avenue") {
-      g.fillStyle = "#e8c547";
-      for (const side of [-0.18, 0.18]) {
-        const [x0, y0] = at(startCut, side);
-        const [x1, y1] = at(startCut + length, side);
-        g.fillRect(Math.min(x0, x1) - 1, Math.min(y0, y1) - 1, Math.abs(x1 - x0) + 2, Math.abs(y1 - y0) + 2);
-      }
-    } else {
+    if (edge.kind !== "avenue") {
       g.fillStyle = "rgba(240, 236, 228, 0.85)";
       for (let s = startCut; s < startCut + length - 2; s += 6) {
         const [x0, y0] = at(s, 0);
@@ -220,13 +217,31 @@ export function paintCity(): HTMLCanvasElement {
     }
   }
 
-  // Start and finish line.
-  const start = GATES[0];
-  const startStreet = STREETS[0];
-  for (let i = 0; i < startStreet.width; i += 1) {
-    for (let j = 0; j < 2; j += 1) {
-      g.fillStyle = (i + j) % 2 === 0 ? "#f4f0e6" : "#262026";
-      g.fillRect((start.x - 1 + j) * PPM, (start.y - startStreet.width / 2 + i) * PPM, PPM, PPM);
+  // Raised flower beds use exactly the same bounds as the solid ground raster.
+  for (const m of MEDIANS) {
+    const x = m.x0 * PPM;
+    const y = m.y0 * PPM;
+    const w = (m.x1 - m.x0) * PPM;
+    const h = (m.y1 - m.y0) * PPM;
+    g.fillStyle = "#25272b88";
+    g.fillRect(x + 2, y + 3, w, h);
+    g.fillStyle = "#d6d0bd";
+    g.fillRect(x, y, w, h);
+    g.fillStyle = "#756351";
+    g.fillRect(x + 2, y + 2, w - 4, h - 4);
+    g.fillStyle = "#426f36";
+    g.fillRect(x + 3, y + 3, w - 6, h - 6);
+    const length = m.vertical ? h : w;
+    for (let t = 6; t < length - 4; t += 9) {
+      const cx = m.vertical ? x + w / 2 : x + t;
+      const cy = m.vertical ? y + t : y + h / 2;
+      g.fillStyle = "#78a447";
+      g.fillRect(cx - 4, cy - 2, 8, 4);
+      g.fillStyle = ["#ffb8c9", "#fff1a3", "#e5ceff"][Math.floor(t / 9) % 3];
+      g.fillRect(cx - 3, cy - 1, 6, 2);
+      g.fillRect(cx - 1, cy - 3, 2, 6);
+      g.fillStyle = "#f5aa43";
+      g.fillRect(cx - 1, cy - 1, 2, 2);
     }
   }
 
@@ -332,35 +347,74 @@ const BUS_COLORS = ["#2e9d5b", "#e2a72e"];
 
 /** A bike from above, facing east: wheels, tank, rider and helmet. */
 function paintBike(g: CanvasRenderingContext2D, w: number, h: number, body: string, shirt: string, helmet: string, racer = false) {
-  const m = h / 2;
-  g.fillStyle = "#1d1a1f";
-  round(g, 0, m - 1.5, 7, 3, 1.5);
-  round(g, w - 7, m - 1.5, 7, 3, 1.5);
+  // Normalized proportions also work for the smaller delivery-bike texture.
+  g.save();
+  g.scale(w / 36, h / 18);
+  const m = 9;
+  // An exposed front wheel and a broad rear mudguard make the silhouette directional.
+  g.fillStyle = "#171922";
+  round(g, 0, m - 2, 9, 4, 1.5);
+  round(g, 28, m - 2, 8, 4, 1.5);
+  g.fillStyle = "#97a4af";
+  g.fillRect(30, m - 0.6, 5, 1.2);
   g.fillStyle = body;
-  round(g, 5, m - 3, w - 11, 6, 3);
-  g.fillStyle = "#2a2528";
-  round(g, 8, m - 2, 9, 4, 2);
-  // Handlebar and mirrors.
-  g.fillStyle = "#3a3438";
-  g.fillRect(w - 9, 1, 2, h - 2);
-  g.fillStyle = "#c9d3da";
-  g.fillRect(w - 8, 0, 2, 2);
-  g.fillRect(w - 8, h - 2, 2, 2);
-  // Rider: shoulders, arms to the bars, helmet.
-  g.fillStyle = shirt;
-  round(g, 8, 1.5, 9, h - 3, 4);
-  g.fillRect(14, 2, w - 22, 2);
-  g.fillRect(14, h - 4, w - 22, 2);
-  g.fillStyle = helmet;
-  g.beginPath();
-  g.arc(14.5, m, 3.6, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = "rgba(0,0,0,0.35)";
-  g.fillRect(16.5, m - 2, 1.5, 4);
-  if (racer) {
-    g.fillStyle = "#ffffff";
-    g.fillRect(11, m - 0.75, 6, 1.5);
+  round(g, 3, m - 4.5, 13, 9, 3);
+  round(g, 19, m - 4, 11, 8, 3);
+  g.fillStyle = "#242431";
+  round(g, 5, m - 3, 12, 6, 2);
+  // Rear lamp, plate and front headlight are deliberately unlike each other.
+  g.fillStyle = "#ff414f";
+  g.fillRect(2, m - 3, 3, 6);
+  g.fillStyle = "#fff3dc";
+  g.fillRect(0, m - 1.5, 2, 3);
+  g.fillStyle = "#fff5a6";
+  round(g, 28, m - 3, 3, 6, 1);
+  // Handlebar and silver mirrors.
+  g.strokeStyle = "#1b2230";
+  g.lineWidth = 1.8;
+  g.beginPath(); g.moveTo(25, 2); g.lineTo(26, 16); g.stroke();
+  g.fillStyle = "#d9eff7";
+  round(g, 24, 0, 4, 2.5, 1);
+  round(g, 24, 15.5, 4, 2.5, 1);
+  // Bent legs, dark trousers and shoes visibly straddle the saddle.
+  g.strokeStyle = "#202d48";
+  g.lineWidth = 3;
+  for (const side of [-1, 1]) {
+    g.beginPath(); g.moveTo(11, m + side * 2); g.lineTo(15, m + side * 6); g.lineTo(20, m + side * 5); g.stroke();
+    g.fillStyle = "#111724";
+    round(g, 18, m + side * 5 - 1, 5, 2, 0.7);
   }
+  // Shoulders, sleeves and bare hands reaching forward to the grips.
+  g.strokeStyle = "#171922";
+  g.lineWidth = 1;
+  g.fillStyle = shirt;
+  round(g, 9, 4, 11, 10, 3);
+  g.strokeRect(10, 5, 8, 8);
+  g.strokeStyle = shirt;
+  g.lineWidth = 3;
+  for (const side of [-1, 1]) {
+    g.beginPath(); g.moveTo(17, m + side * 3); g.lineTo(20, m + side * 6); g.lineTo(25, m + side * 5); g.stroke();
+    g.fillStyle = "#f3bd91";
+    round(g, 24, m + side * 5 - 1.2, 2.5, 2.4, 0.8);
+  }
+  if (racer) {
+    // A tan work bag separates the commuter's back from the helmet and bike.
+    g.fillStyle = "#b77e48";
+    round(g, 8, 5.5, 7, 7, 1.5);
+    g.fillStyle = "#edc68b";
+    g.fillRect(10, 6, 1, 6);
+    g.fillRect(13, 6, 1, 6);
+  }
+  g.fillStyle = "#171922";
+  g.beginPath(); g.arc(19, m, 4.6, 0, Math.PI * 2); g.fill();
+  g.fillStyle = helmet;
+  g.beginPath(); g.arc(19, m, 3.8, 0, Math.PI * 2); g.fill();
+  g.fillStyle = "#ffffff";
+  g.fillRect(16.5, m - 0.7, 4, 1.4);
+  // The dark visor faces the front wheel, not the tail.
+  g.fillStyle = "#223e53";
+  round(g, 21, m - 2.5, 2.3, 5, 0.8);
+  g.restore();
 }
 
 function paintCar(g: CanvasRenderingContext2D, w: number, h: number, color: string) {

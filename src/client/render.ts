@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, Sprite, Text } from "pixi.js";
 import { CITY_H, CITY_W, CORNER, GATES, lightFor, NETWORK } from "../core/city";
 import { lanePoint, RACER_SIZE, SIZES } from "../core/traffic";
+import { COMMUTE_STOPS, HOME, OFFICE, POLICE_POSTS, POTHOLES } from "../core/commute";
 import type { GameEvent, GameState, Racer } from "../core/types";
 import { t } from "./i18n";
 import { buildTextures, chunks, paintCity, PPM, RACER_COLORS, type Textures, VEHICLE_PPM } from "./textures";
@@ -91,6 +92,20 @@ export class Renderer {
     this.rings = [];
     this.skidMarks = [];
     this.camera.ready = false;
+    if (state.commute) {
+      for (const [point, text] of [[HOME, t().home], [OFFICE, t().office]] as const) {
+        const label = new Text({ text, style: { fontFamily: "system-ui, sans-serif", fontSize: 22, fontWeight: "900", fill: "#fff3dc", stroke: { color: "#2b2230", width: 5 } } });
+        label.anchor.set(0.5, 1);
+        label.position.set(point.x * PPM, (point.y - 5) * PPM);
+        this.labelLayer.addChild(label);
+      }
+      for (const post of POLICE_POSTS) {
+        const label = new Text({ text: "CSGT", style: { fontFamily: "system-ui, sans-serif", fontSize: 16, fontWeight: "900", fill: "#ffe4a1", stroke: { color: "#2b2230", width: 4 } } });
+        label.anchor.set(0.5, 1);
+        label.position.set((post.x + 8) * PPM, (post.y - 8) * PPM);
+        this.labelLayer.addChild(label);
+      }
+    }
     const scale = PPM / VEHICLE_PPM;
     for (const npc of state.npcs) {
       const size = SIZES[npc.kind];
@@ -241,8 +256,10 @@ export class Renderer {
         view.spin *= Math.pow(0.05, dt);
       } else view.sprite.rotation = heading;
       // Lean into the turn: the bike looks narrower as it tips over.
-      view.sprite.scale.set(scale, scale * (1 - Math.abs(racer.steer) * 0.18));
-      view.sprite.alpha = racer.ghost > 0 ? (Math.floor(this.time * 12) % 2 ? 0.35 : 0.8) : 1;
+      const riderScale = scale * (i === focus ? 1.3 : 1);
+      view.sprite.scale.set(riderScale, riderScale * (1 - Math.abs(racer.steer) * 0.18));
+      const detained = Boolean(state.commute?.stoppedTicks);
+      view.sprite.alpha = racer.ghost > 0 && !detained ? (Math.floor(this.time * 12) % 2 ? 0.35 : 0.8) : 1;
       view.shadow.position.set(x * PPM + 2, y * PPM + 3);
       view.shadow.rotation = view.sprite.rotation;
       view.name.position.set(x * PPM, y * PPM - 12);
@@ -293,6 +310,36 @@ export class Renderer {
   private drawMarks(state: GameState, focus: number) {
     const g = this.marks;
     g.clear();
+    if (state.commute) {
+      for (const hole of POTHOLES) {
+        const x = hole.x * PPM;
+        const y = hole.y * PPM;
+        g.ellipse(x, y, hole.rx * PPM, hole.ry * PPM).fill({ color: 0x8d7968 }).stroke({ width: 2, color: 0xc8a77e });
+        g.ellipse(x, y + 1, hole.rx * PPM * 0.78, hole.ry * PPM * 0.72).fill({ color: hole.kind === "crater" ? 0x25232b : 0x49404a });
+        if (hole.kind === "crater") {
+          g.moveTo(x - hole.rx * PPM - 3, y - 3).lineTo(x - hole.rx * PPM - 6, y - 7).stroke({ width: 2, color: 0x49404a });
+          g.moveTo(x + hole.rx * PPM, y + 2).lineTo(x + hole.rx * PPM + 5, y + 7).stroke({ width: 2, color: 0x49404a });
+        }
+      }
+      const detainedRider = state.commute.stoppedTicks > 0 ? state.racers[focus] : undefined;
+      const officers = detainedRider
+        ? [...POLICE_POSTS, { x: detainedRider.x - 5, y: detainedRider.y + 6 }]
+        : POLICE_POSTS;
+      for (const post of officers) {
+        const x = (post.x + 8) * PPM;
+        const y = (post.y - 7) * PPM;
+        // Khaki uniform, yellow helmet, red baton, and a striped roadside cone.
+        g.circle(x, y, 5).fill({ color: 0xf2c878 });
+        g.rect(x - 4, y + 4, 8, 10).fill({ color: 0xd4ae71 });
+        g.rect(x - 4, y + 14, 3, 5).fill({ color: 0x33303c });
+        g.rect(x + 1, y + 14, 3, 5).fill({ color: 0x33303c });
+        g.moveTo(x - 4, y + 7).lineTo(x - 11, y + 3).stroke({ width: 3, color: 0xef6b56 });
+        g.poly([x + 12, y + 18, x + 17, y + 5, x + 22, y + 18]).fill({ color: 0xef8551 });
+        g.moveTo(x + 15, y + 12).lineTo(x + 19, y + 12).stroke({ width: 3, color: 0xfff3dc });
+      }
+      g.circle(HOME.x * PPM, HOME.y * PPM, 4 * PPM).stroke({ width: 3, color: 0x8ab8dd, alpha: 0.7 });
+      g.rect((OFFICE.x - 4) * PPM, (OFFICE.y - 4) * PPM, 8 * PPM, 8 * PPM).fill({ color: 0x5fc4b8, alpha: 0.18 }).stroke({ width: 3, color: 0x5fc4b8 });
+    }
     // Stop bars and signal lamps at every lit junction.
     for (const node of NETWORK.nodes) {
       if (!node.light) continue;
@@ -317,7 +364,7 @@ export class Renderer {
     // The next gate: a pulsing ring with chevrons pointing the way through.
     const racer = state.racers[focus];
     if (racer && racer.finishTick < 0) {
-      const gate = GATES[racer.gate];
+      const gate = state.commute ? COMMUTE_STOPS[Math.min(state.commute.checkpoint, COMMUTE_STOPS.length - 1)] : GATES[racer.gate];
       const pulse = 1 + Math.sin(this.time * 5) * 0.06;
       g.circle(gate.x * PPM, gate.y * PPM, gate.r * PPM * pulse).stroke({ width: 5, color: 0xeba96b, alpha: 0.85 });
       g.circle(gate.x * PPM, gate.y * PPM, gate.r * PPM * pulse).fill({ color: 0xeba96b, alpha: 0.1 });
@@ -415,7 +462,7 @@ export class Renderer {
     g.clear();
     const racer = state.racers[focus];
     if (!racer || racer.finishTick >= 0 || state.phase === "countdown") return;
-    const gate = GATES[racer.gate];
+    const gate = state.commute ? COMMUTE_STOPS[Math.min(state.commute.checkpoint, COMMUTE_STOPS.length - 1)] : GATES[racer.gate];
     const zoom = this.world.scale.x;
     const sx = this.world.position.x + gate.x * PPM * zoom;
     const sy = this.world.position.y + gate.y * PPM * zoom;

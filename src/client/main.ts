@@ -1,6 +1,7 @@
 import "./style.css";
 import alumiEyeUrl from "./alumieye.png?inline";
 import { CITY_H, CITY_W, GATES, GROUND } from "../core/city";
+import { COMMUTE_STOPS, commuteElapsed, commuteRemaining, HOME, OFFICE, POLICE_POSTS } from "../core/commute";
 import { createGame, forwardSpeed, standings, step } from "../core/sim";
 import { DT, type GameEvent, type GameState, Surface, TICK_RATE } from "../core/types";
 import { Sound } from "./audio";
@@ -26,6 +27,15 @@ const hud = document.getElementById("hud")!;
 const boostBar = document.getElementById("boost")!;
 const countBox = document.getElementById("count")!;
 const minimap = document.getElementById("minimap") as HTMLCanvasElement;
+const detention = document.createElement("div");
+detention.id = "detention";
+detention.setAttribute("role", "status");
+detention.hidden = true;
+document.body.append(detention);
+const quickHelp = document.createElement("aside");
+quickHelp.id = "quick-help";
+quickHelp.hidden = true;
+document.body.append(quickHelp);
 const renderer = new Renderer();
 const sound = new Sound();
 onButtonPress(() => {
@@ -38,7 +48,6 @@ if (touchMode) document.body.classList.add("touch");
 const settings = {
   difficulty: Number(recall("difficulty") ?? 1) % 3,
   traffic: Number(recall("traffic") ?? 1) % 3,
-  rivals: recall("rivals") === "5" ? 5 : 3,
 };
 const TRAFFIC_DENSITY = [0.6, 1, 1.45];
 
@@ -63,13 +72,16 @@ function startRace() {
   resultsShown = false;
   state = createGame({
     seed: (Math.random() * 1e9) | 0,
-    bots: settings.rivals,
+    mode: "commute",
+    bots: 0,
     difficulty: settings.difficulty,
     humans: 1,
     traffic: TRAFFIC_DENSITY[settings.traffic],
     playerName: t().you,
   });
   focus = 0;
+  quickHelp.hidden = false;
+  quickHelp.innerHTML = `<strong>${t().howTo}</strong><div>${touchMode ? t().touchQuick : t().keyboardQuick}</div><small>${t().roadRules}</small>`;
   renderer.setRace(state);
   accumulator = 0;
   clearPresses();
@@ -90,16 +102,19 @@ function toMenu() {
   boostBar.hidden = true;
   minimap.hidden = true;
   countBox.hidden = true;
+  detention.hidden = true;
+  quickHelp.hidden = true;
   sound.stopRace();
   showMainMenu();
 }
 
 function showMainMenu() {
   const s = t();
-  const record = Number(recall("best") ?? 0);
+  const record = Number(recall("commuteBest") ?? 0);
   panel(
     `<h1>Eye<span>Rush</span></h1>`,
     `<p class="sub">${s.subtitle}</p>`,
+    `<p class="morning-story">${s.story}</p>`,
     buttons([
       [s.race, startRace, "primary"],
       [`${s.difficulty}: ${s.difficulties[settings.difficulty]}`, () => {
@@ -110,11 +125,6 @@ function showMainMenu() {
       [`${s.traffic}: ${s.traffics[settings.traffic]}`, () => {
         settings.traffic = (settings.traffic + 1) % 3;
         remember("traffic", String(settings.traffic));
-        showMainMenu();
-      }],
-      [`${s.rivals}: ${settings.rivals}`, () => {
-        settings.rivals = settings.rivals === 3 ? 5 : 3;
-        remember("rivals", String(settings.rivals));
         showMainMenu();
       }],
       [s.howTo, showHowTo],
@@ -174,6 +184,24 @@ export function formatTime(ticks: number) {
 
 function showResults() {
   const s = t();
+  if (state.commute) {
+    const trip = state.commute;
+    const me = state.racers[0];
+    const elapsed = commuteElapsed(state);
+    const won = trip.outcome === "onTime";
+    const record = Number(recall("commuteBest") ?? 0);
+    const best = won && (record === 0 || elapsed < record);
+    if (best) remember("commuteBest", String(elapsed));
+    panel(
+      `<p class="sub">${s.morning}</p>`,
+      `<h2>${won ? s.onTime : s.late}</h2>`,
+      `<p>${won ? s.onTimeText : s.lateText}</p>`,
+      best ? `<p class="record">${s.newRecord}</p>` : "",
+      `<div class="stats"><span>${s.time}: <b>${formatTime(elapsed)}</b></span><span>${s.penalty}: <b>${formatTime(trip.penaltyTicks)}</b></span><span>${s.violations}: <b>${trip.violations}</b></span><span>${s.potholeHits}: <b>${trip.potholeHits}</b></span><span>${s.crashes}: <b>${me.crashes}</b></span></div>`,
+      buttons([[s.restart, startRace, "primary"], [s.menu, toMenu]]),
+    );
+    return;
+  }
   const order = standings(state);
   const me = state.racers[0];
   const raceTime = me.finishTick >= 0 ? me.finishTick - state.startTick : 0;
@@ -258,68 +286,132 @@ function playEvents(events: GameEvent[]) {
       case "finish":
         if (mine) {
           sound.finish(event.place);
-          toast(`${t().finished}: #${event.place}`);
+          toast(state.commute ? t().onTime : `${t().finished}: #${event.place}`);
         }
         break;
     }
   }
 }
 
-// The minimap: the city painted once, with racers and the next gate on top.
-const MAP_SCALE = 2;
-minimap.width = CITY_W / MAP_SCALE;
-minimap.height = CITY_H / MAP_SCALE;
+// Render at twice the logical resolution so roads and labels stay crisp on phones.
+const MAP_PAD = 16;
+const MAP_TOP = 32;
+const MAP_WIDTH = CITY_W + MAP_PAD * 2;
+const MAP_HEIGHT = CITY_H + MAP_TOP + 42;
+minimap.width = MAP_WIDTH * 2;
+minimap.height = MAP_HEIGHT * 2;
 const mapPaint = minimap.getContext("2d")!;
 const mapBase = (() => {
   const canvas = document.createElement("canvas");
-  canvas.width = minimap.width;
-  canvas.height = minimap.height;
+  canvas.width = CITY_W;
+  canvas.height = CITY_H;
   const g = canvas.getContext("2d")!;
-  const image = g.createImageData(canvas.width, canvas.height);
+  const image = g.createImageData(CITY_W, CITY_H);
   const colors: Record<number, [number, number, number]> = {
-    [Surface.Building]: [61, 33, 65],
-    [Surface.Road]: [239, 227, 204],
-    [Surface.Sidewalk]: [140, 105, 135],
-    [Surface.Alley]: [200, 175, 160],
-    [Surface.Grass]: [96, 140, 74],
-    [Surface.Water]: [80, 140, 190],
-    [Surface.Market]: [170, 130, 110],
-    [Surface.Path]: [170, 160, 120],
-    [Surface.Stall]: [110, 70, 90],
+    [Surface.Building]: [23, 31, 44],
+    [Surface.Road]: [226, 234, 240],
+    [Surface.Sidewalk]: [57, 70, 85],
+    [Surface.Alley]: [151, 173, 190],
+    [Surface.Grass]: [35, 65, 56],
+    [Surface.Water]: [36, 80, 114],
+    [Surface.Market]: [63, 66, 73],
+    [Surface.Path]: [120, 144, 133],
+    [Surface.Stall]: [36, 40, 49],
+    [Surface.Median]: [96, 153, 73],
   };
-  for (let y = 0; y < canvas.height; y += 1) {
-    for (let x = 0; x < canvas.width; x += 1) {
-      const surface = GROUND[y * MAP_SCALE * CITY_W + x * MAP_SCALE];
-      const [r, gr, b] = colors[surface] ?? [0, 0, 0];
-      const i = (y * canvas.width + x) * 4;
-      image.data.set([r, gr, b, 255], i);
-    }
+  for (let i = 0; i < GROUND.length; i += 1) {
+    const [r, gr, b] = colors[GROUND[i]] ?? [23, 31, 44];
+    image.data.set([r, gr, b, 255], i * 4);
   }
   g.putImageData(image, 0, 0);
   return canvas;
 })();
+const MAP_LEGS: [number, number][][] = [
+  [[HOME.x, HOME.y], [253, 19], [253, 52]],
+  [[253, 52], [253, 180]],
+  [[253, 180], [253, 205], [216, 205]],
+  [[216, 205], [99, 205], [99, 176]],
+  [[99, 176], [99, 112]],
+];
 
 function drawMinimap() {
   const g = mapPaint;
+  const s = t();
+  g.setTransform(2, 0, 0, 2, 0, 0);
+  g.fillStyle = "#101925";
+  g.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+  g.font = "bold 13px system-ui";
+  g.fillStyle = "#f3f6fa";
+  g.textAlign = "left";
+  g.fillText(s.navigation, MAP_PAD, 21);
+  g.save();
+  g.translate(MAP_PAD, MAP_TOP);
   g.drawImage(mapBase, 0, 0);
-  const me = state.racers[focus];
-  GATES.forEach((gate, i) => {
-    const next = me && i === me.gate && me.finishTick < 0;
-    g.fillStyle = next ? "#EBA96B" : "rgba(242, 179, 174, 0.7)";
-    g.beginPath();
-    g.arc(gate.x / MAP_SCALE, gate.y / MAP_SCALE, next ? 4 + Math.sin(performance.now() / 150) : 2.5, 0, Math.PI * 2);
-    g.fill();
-  });
-  for (let i = state.racers.length - 1; i >= 0; i -= 1) {
-    const r = state.racers[i];
-    g.fillStyle = RACER_COLORS[r.look % RACER_COLORS.length];
-    g.strokeStyle = "#2b1a2e";
-    g.lineWidth = 1.5;
-    g.beginPath();
-    g.arc(r.x / MAP_SCALE, r.y / MAP_SCALE, i === focus ? 4 : 3, 0, Math.PI * 2);
-    g.fill();
-    g.stroke();
+  const trip = state.commute;
+  if (trip) {
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    MAP_LEGS.forEach((points, i) => {
+      if (i < trip.checkpoint) return;
+      for (const [width, color] of [[8, "#101925"], [4, i === trip.checkpoint ? "#ffbb47" : "#49b4ef"]] as const) {
+        g.lineWidth = width;
+        g.strokeStyle = color;
+        g.beginPath();
+        points.forEach(([x, y], j) => j ? g.lineTo(x, y) : g.moveTo(x, y));
+        g.stroke();
+      }
+    });
+    POLICE_POSTS.forEach((post) => {
+      g.fillStyle = "#315cce";
+      g.strokeStyle = "#ffffff";
+      g.lineWidth = 1;
+      g.fillRect(post.x + 5, post.y - 10, 9, 10);
+      g.strokeRect(post.x + 5, post.y - 10, 9, 10);
+    });
+    g.fillStyle = "#51ddae";
+    g.strokeStyle = "#101925";
+    g.lineWidth = 2;
+    g.fillRect(OFFICE.x - 7, OFFICE.y - 7, 14, 14);
+    g.strokeRect(OFFICE.x - 7, OFFICE.y - 7, 14, 14);
+    g.font = "bold 12px system-ui";
+    g.lineWidth = 4;
+    g.strokeText(s.office, OFFICE.x + 12, OFFICE.y + 4);
+    g.fillText(s.office, OFFICE.x + 12, OFFICE.y + 4);
   }
+  const target = trip ? COMMUTE_STOPS[trip.checkpoint] : GATES[state.racers[focus]?.gate ?? 0];
+  if (target) {
+    g.strokeStyle = "#101925";
+    g.fillStyle = "#ffbb47";
+    g.lineWidth = 2;
+    g.beginPath();
+    g.arc(target.x, target.y, 7, 0, Math.PI * 2);
+    g.fill(); g.stroke();
+    g.fillStyle = "#101925";
+    g.textAlign = "center";
+    g.font = "bold 10px system-ui";
+    g.fillText(String((trip?.checkpoint ?? 0) + 1), target.x, target.y + 3);
+  }
+  const me = state.racers[focus];
+  if (me) {
+    g.translate(me.x, me.y);
+    g.rotate(me.heading);
+    g.beginPath();
+    g.moveTo(11, 0); g.lineTo(-7, -7); g.lineTo(-4, 0); g.lineTo(-7, 7); g.closePath();
+    g.fillStyle = "#ffffff";
+    g.strokeStyle = "#1460d4";
+    g.lineWidth = 3;
+    g.fill(); g.stroke();
+  }
+  g.restore();
+  g.font = "11px system-ui";
+  g.textAlign = "left";
+  const legendY = MAP_TOP + CITY_H + 20;
+  [["#ffffff", s.mapYou, 16], ["#ffbb47", s.mapNext, 144], ["#49b4ef", s.mapLater, 245]].forEach(([color, text, x]) => {
+    g.fillStyle = String(color);
+    g.fillRect(Number(x), legendY - 7, 7, 7);
+    g.fillStyle = "#e2eaf0";
+    g.fillText(String(text), Number(x) + 11, legendY);
+  });
 }
 
 function updateHud() {
@@ -331,7 +423,19 @@ function updateHud() {
   const lap = Math.min(state.laps, me.lap + 1);
   const raceTicks = state.phase === "countdown" ? 0 : (me.finishTick >= 0 ? me.finishTick : state.tick) - state.startTick;
   const kmh = Math.round(Math.max(0, forwardSpeed(me)) * 3.6);
-  hud.innerHTML =
+  const trip = state.commute;
+  detention.hidden = !trip || trip.stoppedTicks <= 0 || state.phase === "done";
+  if (!detention.hidden && trip) {
+    detention.innerHTML = `<strong>${trip.notice === "wrongDirection" ? s.wrongDirection : s.police}</strong><b>${s.detained} ${(trip.stoppedTicks / TICK_RATE).toFixed(1)}s</b><small>${trip.laneRespawn ? s.laneReturnHint : s.detentionHint}</small>`;
+  }
+  const morningSeconds = trip ? Math.min(180, Math.floor(commuteElapsed(state) / trip.deadlineTicks * 180)) : 0;
+  const clock = `${String(7 + Math.floor((57 * 60 + morningSeconds) / 3600)).padStart(2, "0")}:${String(Math.floor((57 * 60 + morningSeconds) / 60) % 60).padStart(2, "0")}:${String(morningSeconds % 60).padStart(2, "0")}`;
+  hud.innerHTML = trip ?
+    `<div class="chip"><small>${s.clock}</small><b>${clock}</b></div>` +
+    `<div class="chip ${commuteRemaining(state) < 20 * TICK_RATE ? "urgent" : ""}"><small>${s.remaining}</small><b>${formatTime(commuteRemaining(state))}</b></div>` +
+    `<div class="chip"><small>${s.route} → ${s.office}</small><b>${Math.min(COMMUTE_STOPS.length, trip.checkpoint + 1)}</b>/${COMMUTE_STOPS.length}</div>` +
+    `<div class="chip speed"><small>km/h</small><b>${kmh}</b></div>` +
+    `<div class="commute-notice" role="status">${trip.notice && state.tick < trip.noticeUntil ? s[trip.notice] : s.commuteHint}</div>` :
     `<div class="chip place"><small>${s.place}</small><b>${place}</b>/${state.racers.length}</div>` +
     `<div class="chip"><small>${s.lap}</small><b>${lap}</b>/${state.laps}</div>` +
     `<div class="chip"><small>${s.time}</small><b>${formatTime(raceTicks)}</b></div>` +
@@ -391,8 +495,9 @@ function frame(now: number) {
     drawMinimap();
     if (state.phase === "done" && !resultsShown) {
       resultsShown = true;
+      const finishedState = state;
       setTimeout(() => {
-        if (mode === "race") showResults();
+        if (mode === "race" && state === finishedState && state.phase === "done") showResults();
       }, 1200);
     }
   }

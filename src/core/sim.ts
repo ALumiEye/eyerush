@@ -1,4 +1,5 @@
 import { botInput } from "./bot";
+import { createCommute, HOME, releaseDetainedRider, stepCommute } from "./commute";
 import { CITY_H, CITY_W, GATES, GROUND, isSolid, NETWORK, surfaceAt } from "./city";
 import { clamp, random } from "./rng";
 import { bodyOfNpc, bodyOfRacer, type Body, Grid, honkAt, SIZES, spawnTraffic, stepTraffic } from "./traffic";
@@ -57,6 +58,7 @@ export const BOT_NAMES = ["Shipper Tuấn", "Cô Lan bán xôi", "Anh xe ôm Hù
 export const DIFFICULTY_POWER = [0.86, 0.94, 1];
 
 export interface RaceOptions {
+  mode?: "race" | "commute";
   seed: number;
   /** How many bots race the player. */
   bots: number;
@@ -147,6 +149,13 @@ export function createGame(options: RaceOptions): GameState {
     if (!human) name = names.splice(Math.floor(random(state) * names.length), 1)[0];
     else if (humans > 1) name = `${options.playerName ?? "P"}${i + 1}`;
     state.racers.push(makeRacer(i, name, !human, human ? 1 : power, x, y));
+  }
+  if (options.mode === "commute") {
+    state.commute = createCommute(options.difficulty);
+    state.laps = 1;
+    const rider = makeRacer(0, options.playerName ?? "Bạn", false, 1, HOME.x, HOME.y);
+    rider.heading = rider.ph = rider.safeHeading = HOME.heading;
+    state.racers = [rider];
   }
   state.npcs = spawnTraffic(state, NETWORK, options.traffic ?? 1);
   return state;
@@ -309,8 +318,10 @@ function trafficContact(state: GameState, racer: Racer) {
       }
       const nx = dx / distance;
       const ny = dy / distance;
-      racer.x -= nx * gap;
-      racer.y -= ny * gap;
+      const pushedX = racer.x - nx * gap;
+      const pushedY = racer.y - ny * gap;
+      if (!circleHitsWorld(pushedX, racer.y, RACER_RADIUS)) racer.x = pushedX;
+      if (!circleHitsWorld(racer.x, pushedY, RACER_RADIUS)) racer.y = pushedY;
       const closing = -((racer.vx - nvx) * nx + (racer.vy - nvy) * ny);
       if (closing > CRASH_SPEED) {
         crash(state, racer, true);
@@ -415,6 +426,10 @@ export function standings(state: GameState): number[] {
 
 /** Advances the race by one tick. `inputs[i]` drives racer i; bots ignore it and drive themselves. */
 export function step(state: GameState, inputs: (Input | undefined)[]): GameState {
+  if (state.phase === "done") {
+    state.events = [];
+    return state;
+  }
   state.tick += 1;
   state.events = [];
   if (state.phase === "countdown") {
@@ -438,6 +453,18 @@ export function step(state: GameState, inputs: (Input | undefined)[]): GameState
     if (racer.honkCooldown > 0) racer.honkCooldown -= 1;
     if (racer.comboTimer > 0 && (racer.comboTimer -= 1) === 0) racer.combo = 0;
     if (racer.ghost > 0) racer.ghost -= 1;
+
+    if (state.commute && state.commute.stoppedTicks > 0) {
+      state.commute.stoppedTicks -= 1;
+      state.commute.penaltyTicks += 1;
+      // Traffic must not shove the detained rider away or cause a second crash.
+      racer.ghost = Math.max(racer.ghost, 2);
+      racer.vx = racer.vy = 0;
+      racer.throttle = racer.steer = 0;
+      racer.boostTicks = 0;
+      if (state.commute.stoppedTicks === 0) releaseDetainedRider(state);
+      continue;
+    }
 
     if (racer.crashed > 0) {
       racer.crashed -= 1;
@@ -499,9 +526,10 @@ export function step(state: GameState, inputs: (Input | undefined)[]): GameState
     trafficContact(state, racer);
   }
   racerContact(state);
-  if (racing) for (const racer of state.racers) checkGates(state, racer);
+  if (state.commute) stepCommute(state);
+  else if (racing) for (const racer of state.racers) checkGates(state, racer);
 
-  if (state.phase === "race") {
+  if (state.phase === "race" && !state.commute) {
     const humans = state.racers.filter((r) => !r.bot);
     const everyone = state.racers.every((r) => r.finishTick >= 0);
     const humansDone = humans.length > 0 && humans.every((r) => r.finishTick >= 0);
@@ -526,6 +554,13 @@ export function stateHash(state: GameState): number {
   for (const n of state.npcs) {
     mix(n.x);
     mix(n.y);
+  }
+  if (state.commute) {
+    mix(state.commute.checkpoint);
+    mix(state.commute.penaltyTicks);
+    mix(state.commute.stoppedTicks);
+    mix(state.commute.violations);
+    mix(state.commute.potholeHits);
   }
   mix(state.rng);
   return hash;
