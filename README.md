@@ -9,16 +9,22 @@ No racing opponents or laps: the clock is your rival.
 07:57. Bạn vừa dậy muộn và 08:00 phải chấm công. Lái xe máy từ nhà đến cơ quan, vượt qua tắc đường,
 đèn xanh đèn đỏ, chốt CSGT, ổ gà và ổ voi. Không đua vòng, không đối thủ — chỉ có bạn và giờ đi làm.
 
+| | |
+|---|---|
+| **Play in the browser / Chơi ngay trên trình duyệt** | https://alumieye.github.io/eyerush/ |
+| **Download (offline, one file) / Tải game (chơi offline, 1 file)** | https://github.com/ALumiEye/eyerush/releases/latest/download/eyerush.html |
+| Releases / Các bản phát hành | https://github.com/ALumiEye/eyerush/releases |
+
 ## Play / Chơi ngay
 
 **In the browser / Trên trình duyệt:** https://alumieye.github.io/eyerush/
 
-**Offline, no install:** download `eyerush.html` from the
-[latest release](https://github.com/ALumiEye/eyerush/releases/latest) and double-click it. The whole
+**Offline, no install:** [download `eyerush.html`](https://github.com/ALumiEye/eyerush/releases/latest/download/eyerush.html)
+(latest release) and double-click it. The whole
 game is in that one file.
 
-**Không cần mạng, không cần cài:** tải `eyerush.html` ở
-[bản phát hành mới nhất](https://github.com/ALumiEye/eyerush/releases/latest) rồi bấm đúp để mở.
+**Không cần mạng, không cần cài:** [tải `eyerush.html`](https://github.com/ALumiEye/eyerush/releases/latest/download/eyerush.html)
+(bản phát hành mới nhất) rồi bấm đúp để mở.
 
 The menu footer shows the running version: the release tag, or `main · <commit>` on the web.
 / Cuối menu hiện phiên bản đang chạy.
