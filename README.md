@@ -9,8 +9,6 @@ No racing opponents or laps: the clock is your rival.
 07:57. Bạn vừa dậy muộn và 08:00 phải chấm công. Lái xe máy từ nhà đến cơ quan, vượt qua tắc đường,
 đèn xanh đèn đỏ, chốt CSGT, ổ gà và ổ voi. Không đua vòng, không đối thủ — chỉ có bạn và giờ đi làm.
 
-The commute changes below are local until a new deployment/release; the public links may still run the previous version.
-
 ## Play / Chơi ngay
 
 **In the browser / Trên trình duyệt:** https://alumieye.github.io/eyerush/
@@ -22,8 +20,12 @@ game is in that one file.
 **Không cần mạng, không cần cài:** tải `eyerush.html` ở
 [bản phát hành mới nhất](https://github.com/ALumiEye/eyerush/releases/latest) rồi bấm đúp để mở.
 
-Releases: push a tag such as `v0.2.0` and the Release workflow builds the game and publishes it,
-using `docs/releases/<tag>.md` as the notes when that file exists.
+The menu footer shows the running version: the release tag, or `main · <commit>` on the web.
+/ Cuối menu hiện phiên bản đang chạy.
+
+Releases: bump `version` in `package.json`, write `docs/releases/<tag>.md`, commit, then push a tag such
+as `v0.3.0`. The Release workflow tests, builds and publishes `eyerush.html` with `SHA256SUMS.txt`;
+the release appears only after everything passes. The web version deploys from `main` on every push.
 
 **From source / Từ mã nguồn** (Node.js 22+ and pnpm):
 

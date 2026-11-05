@@ -6,6 +6,8 @@ import { defineConfig } from "vite";
  */
 export default defineConfig(({ mode }) => ({
   base: "./",
+  // Shown in the menu footer: the release tag, or "main · <commit>" on Pages (set by the workflows).
+  define: { __GAME_VERSION__: JSON.stringify(process.env.GAME_VERSION || "dev") },
   build: {
     target: "es2022",
     chunkSizeWarningLimit: 1500,

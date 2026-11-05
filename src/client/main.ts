@@ -137,7 +137,7 @@ function showMainMenu() {
         showMainMenu();
       }],
     ]),
-    `<p class="foot">${record ? `${s.best}: ${formatTime(record)} · ` : ""}ALumiEye</p>`,
+    `<p class="foot">${record ? `${s.best}: ${formatTime(record)} · ` : ""}ALumiEye · <span id="game-version">${__GAME_VERSION__}</span></p>`,
   );
 }
 

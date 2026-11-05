@@ -22,14 +22,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm build
+        env:
+          GAME_VERSION: ${{ github.ref_name }}
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
+          (cd dist && sha256sum eyerush.html > SHA256SUMS.txt)
           notes="docs/releases/$TAG.md"
           if [ -f "$notes" ]; then
-            gh release create "$TAG" dist/eyerush.html --title "EyeRush $TAG" --notes-file "$notes"
+            gh release create "$TAG" dist/eyerush.html dist/SHA256SUMS.txt --title "EyeRush $TAG" --notes-file "$notes" --verify-tag
           else
-            gh release create "$TAG" dist/eyerush.html --title "EyeRush $TAG" --generate-notes
+            gh release create "$TAG" dist/eyerush.html dist/SHA256SUMS.txt --title "EyeRush $TAG" --generate-notes --verify-tag
           fi
